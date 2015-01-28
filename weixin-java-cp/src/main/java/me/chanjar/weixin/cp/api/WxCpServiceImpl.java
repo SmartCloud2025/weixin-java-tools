@@ -78,7 +78,7 @@ public class WxCpServiceImpl implements WxCpService {
 
   public void userAuthenticated(String userId) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/user/authsucc?userid=" + userId;
-    execute(new SimpleGetRequestExecutor(), url, null);
+    get(url, null);
   }
 
   public String getAccessToken() throws WxErrorException {
@@ -123,23 +123,23 @@ public class WxCpServiceImpl implements WxCpService {
 
   public void messageSend(WxCpMessage message) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/message/send";
-    execute(new SimplePostRequestExecutor(), url, message.toJson());
+    post(url, message.toJson());
   }
 
   public void menuCreate(WxMenu menu) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/menu/create?agentid=" + wxCpConfigStorage.getAgentId();
-    execute(new SimplePostRequestExecutor(), url, menu.toJson());
+    post(url, menu.toJson());
   }
 
   public void menuDelete() throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/menu/delete?agentid=" + wxCpConfigStorage.getAgentId();
-    execute(new SimpleGetRequestExecutor(), url, null);
+    get(url, null);
   }
 
   public WxMenu menuGet() throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/menu/get?agentid=" + wxCpConfigStorage.getAgentId();
     try {
-      String resultContent = execute(new SimpleGetRequestExecutor(), url, null);
+      String resultContent = get(url, null);
       return WxMenu.fromJson(resultContent);
     } catch (WxErrorException e) {
       // 46003 不存在的菜单数据
@@ -178,17 +178,17 @@ public class WxCpServiceImpl implements WxCpService {
 
   public void departUpdate(WxCpDepart group) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/department/update";
-    execute(new SimplePostRequestExecutor(), url, group.toJson());
+    post(url, group.toJson());
   }
 
   public void departDelete(Integer departId) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/department/delete?id=" + departId;
-    execute(new SimpleGetRequestExecutor(), url, null);
+    get(url, null);
   }
 
   public List<WxCpDepart> departGet() throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/department/list";
-    String responseContent = execute(new SimpleGetRequestExecutor(), url, null);
+    String responseContent = get(url, null);
     /*
      * 操蛋的微信API，创建时返回的是 { group : { id : ..., name : ...} }
      * 查询时返回的是 { groups : [ { id : ..., name : ..., count : ... }, ... ] }
@@ -204,26 +204,60 @@ public class WxCpServiceImpl implements WxCpService {
   @Override
   public void userCreate(WxCpUser user) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/user/create";
-    execute(new SimplePostRequestExecutor(), url, user.toJson());
+    post(url, user.toJson());
   }
 
   @Override
   public void userUpdate(WxCpUser user) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/user/update";
-    execute(new SimplePostRequestExecutor(), url, user.toJson());
+    post(url, user.toJson());
   }
 
   @Override
   public void userDelete(String userid) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/user/delete?userid=" + userid;
-    execute(new SimpleGetRequestExecutor(), url, null);
+    get(url, null);
+  }
+
+  @Override
+  public void userDelete(String[] userids) throws WxErrorException {
+    String url = "https://qyapi.weixin.qq.com/cgi-bin/user/batchdelete";
+    JsonObject jsonObject = new JsonObject();
+    JsonArray jsonArray = new JsonArray();
+    for (int i = 0; i < userids.length; i++) {
+      jsonArray.add(new JsonPrimitive(userids[i]));
+    }
+    jsonObject.add("useridlist", jsonArray);
+    post(url, jsonObject.toString());
   }
 
   @Override
   public WxCpUser userGet(String userid) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/user/get?userid=" + userid;
-    String responseContent = execute(new SimpleGetRequestExecutor(), url, null);
+    String responseContent = get(url, null);
     return WxCpUser.fromJson(responseContent);
+  }
+
+  @Override
+  public List<WxCpUser> userList(Integer departId, Boolean fetchChild, Integer status) throws WxErrorException {
+    String url = "https://qyapi.weixin.qq.com/cgi-bin/user/list?department_id=" + departId;
+    String params = "";
+    if (fetchChild != null) {
+      params += "&fetch_child=" + (fetchChild ? "1" : "0");
+    }
+    if (status != null) {
+      params += "&status=" + status;
+    } else {
+      params += "&status=0";
+    }
+
+    String responseContent = get(url, params);
+    JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
+    return WxCpGsonBuilder.INSTANCE.create()
+        .fromJson(
+            tmpJsonElement.getAsJsonObject().get("userlist"),
+            new TypeToken<List<WxCpUser>>() { }.getType()
+        );
   }
 
   @Override
@@ -239,7 +273,7 @@ public class WxCpServiceImpl implements WxCpService {
       params += "&status=0";
     }
 
-    String responseContent = execute(new SimpleGetRequestExecutor(), url, params);
+    String responseContent = get(url, params);
     JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
     return WxCpGsonBuilder.INSTANCE.create()
         .fromJson(
@@ -253,7 +287,7 @@ public class WxCpServiceImpl implements WxCpService {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/tag/create";
     JsonObject o = new JsonObject();
     o.addProperty("tagname", tagName);
-    String responseContent = execute(new SimplePostRequestExecutor(), url, o.toString());
+    String responseContent = post(url, o.toString());
     JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
     return tmpJsonElement.getAsJsonObject().get("tagid").getAsString();
   }
@@ -264,19 +298,19 @@ public class WxCpServiceImpl implements WxCpService {
     JsonObject o = new JsonObject();
     o.addProperty("tagid", tagId);
     o.addProperty("tagname", tagName);
-    execute(new SimplePostRequestExecutor(), url, o.toString());
+    post(url, o.toString());
   }
 
   @Override
   public void tagDelete(String tagId) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/tag/delete?tagid=" + tagId;
-    execute(new SimpleGetRequestExecutor(), url, null);
+    get(url, null);
   }
 
   @Override
   public List<WxCpTag> tagGet() throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/tag/list";
-    String responseContent = execute(new SimpleGetRequestExecutor(), url, null);
+    String responseContent = get(url, null);
     JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
     return WxCpGsonBuilder.INSTANCE.create()
         .fromJson(
@@ -288,7 +322,7 @@ public class WxCpServiceImpl implements WxCpService {
   @Override
   public List<WxCpUser> tagGetUsers(String tagId) throws WxErrorException {
     String url = "https://qyapi.weixin.qq.com/cgi-bin/tag/get?tagid=" + tagId;
-    String responseContent = execute(new SimpleGetRequestExecutor(), url, null);
+    String responseContent = get(url, null);
     JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
     return WxCpGsonBuilder.INSTANCE.create()
         .fromJson(
@@ -307,7 +341,7 @@ public class WxCpServiceImpl implements WxCpService {
       jsonArray.add(new JsonPrimitive(userId));
     }
     jsonObject.add("userlist", jsonArray);
-    execute(new SimplePostRequestExecutor(), url, jsonObject.toString());
+    post(url, jsonObject.toString());
   }
 
   @Override
@@ -320,7 +354,7 @@ public class WxCpServiceImpl implements WxCpService {
       jsonArray.add(new JsonPrimitive(userId));
     }
     jsonObject.add("userlist", jsonArray);
-    execute(new SimplePostRequestExecutor(), url, jsonObject.toString());
+    post(url, jsonObject.toString());
   }
 
   @Override
@@ -357,6 +391,31 @@ public class WxCpServiceImpl implements WxCpService {
     }
   }
 
+  @Override
+  public int invite(String userId, String inviteTips) throws WxErrorException {
+    String url = "https://qyapi.weixin.qq.com/cgi-bin/invite/send";
+    JsonObject jsonObject = new JsonObject();
+    jsonObject.addProperty("userid", userId);
+    if (StringUtils.isNotEmpty(inviteTips)) {
+      jsonObject.addProperty("invite_tips", inviteTips);
+    }
+    String responseContent = post(url, jsonObject.toString());
+    JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
+    return tmpJsonElement.getAsJsonObject().get("type").getAsInt();
+  }
+
+  @Override
+  public String[] getCallbackIp() throws WxErrorException {
+    String url = "https://qyapi.weixin.qq.com/cgi-bin/getcallbackip";
+    String responseContent = get(url, null);
+    JsonElement tmpJsonElement = Streams.parse(new JsonReader(new StringReader(responseContent)));
+    JsonArray jsonArray = tmpJsonElement.getAsJsonObject().get("ip_list").getAsJsonArray();
+    String[] ips = new String[jsonArray.size()];
+    for(int i = 0; i < jsonArray.size(); i++) {
+      ips[i] = jsonArray.get(i).getAsString();
+    }
+    return ips;
+  }
 
   public String get(String url, String queryParam) throws WxErrorException {
     return execute(new SimpleGetRequestExecutor(), url, queryParam);
